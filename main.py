@@ -4,6 +4,8 @@ from order_courier import Order, Courier, OrderStatus, CourierStatus
 from dispatch_system import DispatchSystem
 from simulation import SimulationModule, Strategy, RevenueFirstStrategy, UrgencyFirstStrategy, BalancedStrategy
 
+random.seed(114514)
+
 def create_sample_network():
     network = CityNetwork()
     for i in range(1, 10):
@@ -120,6 +122,16 @@ def demo_basic_operations():
     print("Demo 1: Basic Operations")
     print("=" * 60)
 
+    import os
+    # Clean up previous demo data
+    for ext in ['', '.idx.amount', '.idx.urgency', '.idx.time', '.root']:
+        path = "orders.dat" + ext
+        if os.path.exists(path):
+            try:
+                os.remove(path)
+            except:
+                pass
+
     # Create and visualize initial network
     network = create_sample_network()
     visualize_city_network(network, "Initial City Network")
@@ -226,6 +238,16 @@ def demo_priority_calculation():
     print("Demo 2: Priority Calculation Analysis")
     print("=" * 60)
 
+    import os
+    # Clean up previous demo data
+    for ext in ['', '.idx.amount', '.idx.urgency', '.idx.time', '.root']:
+        path = "orders.dat" + ext
+        if os.path.exists(path):
+            try:
+                os.remove(path)
+            except:
+                pass
+
     network = create_sample_network()
     system = DispatchSystem(network)
     base_time = 1000.0
@@ -254,6 +276,16 @@ def demo_order_assignment():
     print("\n" + "=" * 60)
     print("Demo 3: Order Assignment Process")
     print("=" * 60)
+
+    import os
+    # Clean up previous demo data
+    for ext in ['', '.idx.amount', '.idx.urgency', '.idx.time', '.root']:
+        path = "orders.dat" + ext
+        if os.path.exists(path):
+            try:
+                os.remove(path)
+            except:
+                pass
 
     network = create_sample_network()
     system = DispatchSystem(network)
@@ -288,12 +320,234 @@ def demo_order_assignment():
     print(f"  Successful assignments: {len(assignments)}")
 
 def demo_simulation():
+    import os
     print("\n" + "=" * 60)
-    print("Demo 4: System Simulation")
+    print("Demo 4: System Simulation (Time Unit = Minutes)")
+    print("=" * 60)
+
+    # === SCENARIO 1: Normal Simulation ===
+    print("\n" + "="*60)
+    print("SCENARIO 1: Normal Simulation (20-50 min Time Limits)")
+    print("="*60)
+    
+    # Clean up
+    for ext in ['', '.idx.amount', '.idx.urgency', '.idx.time', '.root']:
+        path = "orders.dat" + ext
+        if os.path.exists(path):
+            try:
+                os.remove(path)
+            except:
+                pass
+    
+    network1 = create_sample_network()
+    system1 = DispatchSystem(network1)
+    
+    for courier in create_sample_couriers(5):
+        system1.add_courier(courier)
+    
+    sim1 = SimulationModule(system1, verbose=True)
+    
+    arrival_times1 = [10, 15, 25, 40, 60, 65, 70, 80]
+    for i, t in enumerate(arrival_times1):
+        order = Order(
+            order_id=i + 1,
+            start_time=float(t),
+            start_node=random.randint(1, 9),
+            end_node=random.randint(1, 9),
+            amount=random.uniform(20, 80),
+            urgency=random.randint(1, 10),
+            time_limit=random.randint(20, 50)
+        )
+        sim1.add_order_arrival_event(float(t), order)
+
+    # Run the simulation
+    sim1.run_simulation(200.0)
+    
+    # Export logs to Excel
+    excel_file1 = sim1.export_logs_to_excel('scenario1_normal.xlsx')
+    print(f"\n[OK] Detailed logs exported to: {excel_file1}")
+    
+    results1 = sim1.get_simulation_results()
+    stats1 = results1['final_stats']
+    
+    print("\n--- Scenario 1 Results (Normal) ---")
+    print(f"  Completed Orders: {stats1['completed_orders']}")
+    print(f"  Pending Orders: {stats1['pending_orders']}")
+    print(f"  On-Time Completed: {stats1['on_time_orders']}")
+    print(f"  Delayed Orders: {stats1['delayed_orders']}")
+    print(f"  Timeout Orders: {stats1['timeout_orders']}")
+    print(f"  Avg Wait Time: {stats1['avg_waiting_time']:.1f} min")
+    print(f"  Total Penalty: ${stats1['total_penalty']:.2f}")
+    print(f"  Net Revenue: ${stats1['total_revenue']:.2f}")
+    print(f"  Idle Couriers: {stats1['idle_couriers']}")
+    print(f"  Busy Couriers: {stats1['busy_couriers']}")
+    
+    # SCENARIO 2: Order Surge - 15 orders arriving within 5 time units
+    print("\n" + "=" * 60)
+    print("SCENARIO 2: ORDER SURGE")
+    print("  15 orders arriving within 5 min, 5 couriers (20-50 min Time Limits)")
+    print("=" * 60)
+    
+    # Clean up
+    for ext in ['', '.idx.amount', '.idx.urgency', '.idx.time', '.root']:
+        path = "orders.dat" + ext
+        if os.path.exists(path):
+            try:
+                os.remove(path)
+            except:
+                pass
+    
+    network2 = create_sample_network()
+    system2 = DispatchSystem(network2)
+    
+    # Add 5 couriers for surge scenario
+    for courier in create_sample_couriers(5):
+        system2.add_courier(courier)
+    
+    sim2 = SimulationModule(system2, verbose=False)
+    
+    # 15 orders arriving at times 100-105 (5 time units)
+    base_time = 10
+    for i in range(15):
+        order = Order(
+            order_id=i + 1,
+            start_time=float(base_time + i * 0.33),  # Spread within 5 units
+            start_node=random.randint(1, 9),
+            end_node=random.randint(1, 9),
+            amount=random.uniform(30, 100),  # Higher amounts during surge
+            urgency=random.randint(5, 10),  # Higher urgency
+            time_limit=random.randint(20, 40)  # Tighter time limits
+        )
+        sim2.add_order_arrival_event(order.start_time, order)
+    
+    print("\nOrders arriving: 15 orders from T=10 to T=15 (within 5 min)")
+    print("Couriers available: 5")
+    print("Order amounts: $30-$100 (surge pricing)")
+    print("Order urgency: 5-10 (high priority)")
+    print("Time limits: 20-50 min")
+    
+    sim2.run_simulation(200.0)  # Run until T=200
+    
+    # Export logs to Excel
+    excel_file2 = sim2.export_logs_to_excel('scenario2_surge.csv')
+    print(f"\n[OK] Detailed logs exported to: {excel_file2}")
+    
+    results2 = sim2.get_simulation_results()
+    stats2 = results2['final_stats']
+    
+    print("\n--- Scenario 2 Results (Order Surge) ---")
+    print(f"  Completed Orders: {stats2['completed_orders']}")
+    print(f"  Pending Orders: {stats2['pending_orders']}")
+    print(f"  On-Time Completed: {stats2['on_time_orders']}")
+    print(f"  Delayed Orders: {stats2['delayed_orders']}")
+    print(f"  Timeout Orders: {stats2['timeout_orders']}")
+    print(f"  Avg Wait Time: {stats2['avg_waiting_time']:.1f} min")
+    print(f"  Total Penalty: ${stats2['total_penalty']:.2f}")
+    print(f"  Net Revenue: ${stats2['total_revenue']:.2f}")
+    print(f"  Idle Couriers: {stats2['idle_couriers']}")
+    print(f"  Busy Couriers: {stats2['busy_couriers']}")
+    
+    if stats2['timeout_orders'] > 0:
+        print(f"\n  [WARNING] {stats2['timeout_orders']} orders TIMED OUT due to surge!")
+    
+    # SCENARIO 3: Heavy Rain - Edge weights increased
+    print("\n" + "=" * 60)
+    print("SCENARIO 3: HEAVY RAIN")
+    print("  All road weights increased by 1.5x-3x (random) (20-50 min Time Limits)")
+    print("=" * 60)
+    
+    # Clean up
+    for ext in ['', '.idx.amount', '.idx.urgency', '.idx.time', '.root']:
+        path = "orders.dat" + ext
+        if os.path.exists(path):
+            try:
+                os.remove(path)
+            except:
+                pass
+    
+    network3 = create_sample_network()
+    
+    # Apply rain effect - increase all edge weights
+    print("\nApplying rain effect to roads (time unit = min):")
+    rain_multipliers = {}
+    for from_node in list(network3.edges.keys()):
+        for to_node in list(network3.edges[from_node].keys()):
+            if from_node < to_node:  # Only show each edge once
+                original_weight = network3.edges[from_node][to_node]
+                # Random multiplier between 1.5 and 3.0
+                rain_multiplier = random.uniform(1.5, 3.0)
+                rain_multipliers[(from_node, to_node)] = rain_multiplier
+                new_weight = int(original_weight * rain_multiplier)
+                network3.update_edge(from_node, to_node, new_weight)
+                print(f"  Road {from_node}-{to_node}: {original_weight} min -> {new_weight} min (×{rain_multiplier:.2f})")
+    
+    system3 = DispatchSystem(network3)
+    
+    # Same couriers as scenario 1
+    for courier in create_sample_couriers(5):
+        system3.add_courier(courier)
+    
+    sim3 = SimulationModule(system3, verbose=False)
+    
+    # Same orders as scenario 1
+    for i, t in enumerate(arrival_times1):
+        order = Order(
+            order_id=i + 1,
+            start_time=float(t),
+            start_node=random.randint(1, 9),
+            end_node=random.randint(1, 9),
+            amount=random.uniform(30, 100), # Higher amounts during rain
+            urgency=random.randint(1, 10),
+            time_limit=random.randint(30, 55) # wider time limits for rain
+        )
+        sim3.add_order_arrival_event(float(t), order)
+    
+    print(f"\nSame 8 orders and 5 couriers as Scenario 1")
+    print(f"But now roads are affected by heavy rain...")
+    
+    sim3.run_simulation(200.0)
+    
+    # Export logs to Excel
+    excel_file3 = sim3.export_logs_to_excel('scenario3_rain.xlsx')
+    print(f"\n[OK] Detailed logs exported to: {excel_file3}")
+    
+    results3 = sim3.get_simulation_results()
+    stats3 = results3['final_stats']
+    
+    print("\n--- Scenario 3 Results (Heavy Rain) ---")
+    print(f"  Completed Orders: {stats3['completed_orders']}")
+    print(f"  Pending Orders: {stats3['pending_orders']}")
+    print(f"  On-Time Completed: {stats3['on_time_orders']}")
+    print(f"  Delayed Orders: {stats3['delayed_orders']}")
+    print(f"  Timeout Orders: {stats3['timeout_orders']}")
+    print(f"  Avg Wait Time: {stats3['avg_waiting_time']:.1f} min")
+    print(f"  Total Penalty: ${stats3['total_penalty']:.2f}")
+    print(f"  Net Revenue: ${stats3['total_revenue']:.2f}")
+    print(f"  Idle Couriers: {stats3['idle_couriers']}")
+    print(f"  Busy Couriers: {stats3['busy_couriers']}")
+    
+    # COMPARISON SUMMARY
+    print("\n" + "=" * 60)
+    print("COMPARISON SUMMARY")
+    print("=" * 60)
+    print(f"{'Metric':<25} {'Normal':<12} {'Surge':<12} {'Rain':<12}")
+    print("-" * 70)
+    print(f"{'Completed Orders':<25} {stats1['completed_orders']:<12} {stats2['completed_orders']:<12} {stats3['completed_orders']:<12}")
+    print(f"{'Pending Orders':<25} {stats1['pending_orders']:<12} {stats2['pending_orders']:<12} {stats3['pending_orders']:<12}")
+    print(f"{'Timeout Orders':<25} {stats1['timeout_orders']:<12} {stats2['timeout_orders']:<12} {stats3['timeout_orders']:<12}")
+    print(f"{'On-Time Orders':<25} {stats1['on_time_orders']:<12} {stats2['on_time_orders']:<12} {stats3['on_time_orders']:<12}")
+    print(f"{'Delayed Orders':<25} {stats1['delayed_orders']:<12} {stats2['delayed_orders']:<12} {stats3['delayed_orders']:<12}")
+    print(f"{'Avg Wait Time (min)':<25} {stats1['avg_waiting_time']:<12.1f} {stats2['avg_waiting_time']:<12.1f} {stats3['avg_waiting_time']:<12.1f}")
+    print(f"{'Total Penalty ($)':<25} ${stats1['total_penalty']:<11.2f} ${stats2['total_penalty']:<11.2f} ${stats3['total_penalty']:<11.2f}")
+    print(f"{'Net Revenue ($)':<25} ${stats1['total_revenue']:<11.2f} ${stats2['total_revenue']:<11.2f} ${stats3['total_revenue']:<11.2f}")
+
+def demo_strategy_comparison():
+    print("\n" + "=" * 60)
+    print("Demo 5: Strategy Comparison (Time Unit = Minutes)")
     print("=" * 60)
 
     import os
-    # Clean up previous simulation data
+    # Clean up previous demo data
     for ext in ['', '.idx.amount', '.idx.urgency', '.idx.time', '.root']:
         path = "orders.dat" + ext
         if os.path.exists(path):
@@ -302,50 +556,8 @@ def demo_simulation():
             except:
                 pass
 
-    network = create_sample_network()
-    system = DispatchSystem(network)
-
-    for courier in create_sample_couriers(4):
-        system.add_courier(courier)
-
-    sim = SimulationModule(system)
-
-    arrival_times = [100, 150, 200, 300, 350, 400, 500, 600]
-    for i, t in enumerate(arrival_times):
-        order = Order(
-            order_id=i + 1,
-            start_time=float(t),
-            start_node=random.randint(1, 9),
-            end_node=random.randint(1, 9),
-            amount=random.uniform(20, 80),
-            urgency=random.randint(1, 10),
-            time_limit=random.randint(300, 1200)
-        )
-        sim.add_order_arrival_event(float(t), order)
-
-    print("\nSimulation Setup:")
-    print(f"  Couriers: 4")
-    print(f"  Orders: 8 (arriving at times: {arrival_times})")
-    print(f"  Duration: 1000 time units")
-
-    sim.run_simulation(1000.0)
-
-    results = sim.get_simulation_results()
-    stats = results['final_stats']
-
-    print("\n--- Simulation Results ---")
-    print(f"  Completed Orders: {stats['completed_orders']}")
-    print(f"  Pending Orders: {stats['pending_orders']}")
-    print(f"  Total Revenue: ${stats['total_revenue']:.2f}")
-    print(f"  Timeout Orders: {stats['timeout_orders']}")
-
-def demo_strategy_comparison():
-    print("\n" + "=" * 60)
-    print("Demo 5: Strategy Comparison")
-    print("=" * 60)
-
-    duration = 800.0
-    base_time = 1000.0
+    duration = 200.0  # Simulation runs for 200 minutes
+    base_time = 10.0  # Start from minute 10
 
     strategies = [
         RevenueFirstStrategy(),
@@ -353,6 +565,11 @@ def demo_strategy_comparison():
         BalancedStrategy()
     ]
 
+    print("\nSimulation Setup:")
+    print(f"  Duration: {duration} min")
+    print(f"  Orders: 15")
+    print(f"  Time limit range: 20-50 min")
+    print(f"  Couriers: 5")
     print("\nRunning simulations with different strategies...")
     print("-" * 70)
 
@@ -364,15 +581,15 @@ def demo_strategy_comparison():
         for courier in create_sample_couriers(5):
             system.add_courier(courier)
 
-        for i in range(15):
+        for i in range(30):
             order = Order(
                 order_id=i + 1,
-                start_time=base_time + random.randint(0, 400),
+                start_time=base_time + random.randint(0, 80),  # Arrives between 10-90 min
                 start_node=random.randint(1, 9),
                 end_node=random.randint(1, 9),
                 amount=random.uniform(15, 100),
                 urgency=random.randint(1, 10),
-                time_limit=random.randint(200, 1000)
+                time_limit=random.randint(20, 50)  # 20-50 min time limit
             )
             system.add_order(order)
 
@@ -380,9 +597,14 @@ def demo_strategy_comparison():
         stats = system.get_system_stats()
 
         print(f"\n{strategy.name()}:")
-        print(f"  Completed: {stats['completed_orders']}")
-        print(f"  Pending: {stats['pending_orders']}")
-        print(f"  Revenue: ${stats['total_revenue']:.2f}")
+        print(f"  Completed Orders: {stats['completed_orders']}")
+        print(f"  Pending Orders: {stats['pending_orders']}")
+        print(f"  On-Time Completed: {stats['on_time_orders']}")
+        print(f"  Delayed Orders: {stats['delayed_orders']}")
+        print(f"  Timeout Orders: {stats['timeout_orders']}")
+        print(f"  Avg Wait Time: {stats['avg_waiting_time']:.1f} min")
+        print(f"  Total Penalty: ${stats['total_penalty']:.2f}")
+        print(f"  Net Revenue: ${stats['total_revenue']:.2f}")
         print(f"  Busy Couriers: {stats['busy_couriers']}")
 
 def demo_disk_index():

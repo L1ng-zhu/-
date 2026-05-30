@@ -41,6 +41,36 @@ class Order:
         if self.status == OrderStatus.COMPLETED:
             return False
         return current_time - self.start_time > self.time_limit
+    
+    def get_waiting_time(self, current_time):
+        return current_time - self.start_time
+    
+    def calculate_penalty(self, check_time=None):
+        if self.status != OrderStatus.COMPLETED:
+            return 0.0
+        
+        if check_time is None:
+            check_time = self.completed_time if self.completed_time else self.start_time + self.time_limit + 1
+        
+        delay = check_time - (self.start_time + self.time_limit)
+        
+        if delay <= 0:
+            return 0.0
+        elif delay <= 10:
+            return 0.0
+        elif delay <= 15:
+            return self.amount * 0.20
+        elif delay <= 20:
+            return self.amount * 0.40
+        else:
+            return self.amount * 1.00
+    
+    def calculate_actual_revenue(self, check_time=None):
+        if self.status != OrderStatus.COMPLETED:
+            return 0.0
+        
+        penalty = self.calculate_penalty(check_time)
+        return max(0, self.amount - penalty)
 
     def __repr__(self):
         return (f"Order({self.order_id}, status={self.status.name}, "
@@ -68,11 +98,17 @@ class Courier:
         order.assigned_courier = self.courier_id
         order.assigned_time = order.start_time
 
-    def complete_order(self, completed_time):
+    def complete_order(self, completed_time, apply_penalty=False):
         if self.current_order:
             self.current_order.status = OrderStatus.COMPLETED
             self.current_order.completed_time = completed_time
-            self.total_earnings += self.current_order.amount
+            
+            if apply_penalty:
+                actual_revenue = self.current_order.calculate_actual_revenue(completed_time)
+                self.total_earnings += actual_revenue
+            else:
+                self.total_earnings += self.current_order.amount
+                
             self.completed_orders += 1
             self.current_order = None
         self.status = CourierStatus.IDLE

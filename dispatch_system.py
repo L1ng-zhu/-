@@ -71,9 +71,9 @@ class DispatchSystem:
         order.start_execute_time = self.current_time
         courier.current_node = order.end_node
 
-    def complete_order(self, courier):
+    def complete_order(self, courier, apply_penalty=True):
         if courier.current_order:
-            courier.complete_order(self.current_time)
+            courier.complete_order(self.current_time, apply_penalty=apply_penalty)
             self.order_index.update(courier.current_order)
 
     def get_idle_couriers(self):
@@ -89,7 +89,7 @@ class DispatchSystem:
     def set_time(self, t):
         self.current_time = t
 
-    def get_system_stats(self):
+    def get_system_stats(self, apply_penalty=True):
         orders = self.order_index.get_all_orders()
         completed = [o for o in orders if o.status == OrderStatus.COMPLETED]
         pending = [o for o in orders if o.status == OrderStatus.PENDING]
@@ -97,8 +97,24 @@ class DispatchSystem:
         idle_couriers = self.get_idle_couriers()
         busy_couriers = [c for c in self.couriers.values() if c.status == CourierStatus.BUSY]
 
-        total_revenue = sum(o.amount for o in completed)
         timeout_orders = [o for o in orders if o.is_timeout(self.current_time)]
+        
+        total_revenue = sum(o.amount for o in completed)
+        if apply_penalty:
+            actual_revenue = sum(o.calculate_actual_revenue(o.completed_time) for o in completed)
+            total_penalty = total_revenue - actual_revenue
+        else:
+            actual_revenue = total_revenue
+            total_penalty = 0
+        
+        if completed:
+            waiting_times = [max(0, o.completed_time - o.start_time) for o in completed]
+            avg_waiting_time = sum(waiting_times) / len(completed) if waiting_times else 0
+        else:
+            avg_waiting_time = 0
+        
+        on_time_orders = [o for o in completed if o.completed_time - o.start_time <= o.time_limit]
+        delayed_orders = [o for o in completed if o.completed_time - o.start_time > o.time_limit]
 
         return {
             'current_time': self.current_time,
@@ -109,8 +125,12 @@ class DispatchSystem:
             'total_couriers': len(self.couriers),
             'idle_couriers': len(idle_couriers),
             'busy_couriers': len(busy_couriers),
-            'total_revenue': total_revenue,
-            'timeout_orders': len(timeout_orders)
+            'total_revenue': actual_revenue,
+            'total_penalty': total_penalty,
+            'timeout_orders': len(timeout_orders),
+            'on_time_orders': len(on_time_orders),
+            'delayed_orders': len(delayed_orders),
+            'avg_waiting_time': avg_waiting_time
         }
 
     def reset(self):
